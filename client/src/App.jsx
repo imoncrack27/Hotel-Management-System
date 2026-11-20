@@ -29,7 +29,7 @@ function Login({ done }) {
         <img src="/Jades.jpeg" alt="Jade Mountain View" />
       </div>
       <form className="card" onSubmit={go}>
-        <h2>Jade's staff login</h2>
+        <h2>Jade's Mountain View Staff Login</h2>
         <label>
           Email
           <input
