@@ -22,7 +22,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14122a;
-    --bg-img: url("/jade-bg-dark.jpg");
+    --bg-img: url("/jade-bg.jpg");
     --card: #1e1b3a;
     --ink: #ece9ff;
     --mute: #a19ec4;
