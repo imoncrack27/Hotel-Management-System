@@ -25,6 +25,9 @@ function Login({ done }) {
   };
   return (
     <div className="login">
+      <div className="big-logo">
+        <img src="/Jades.jpeg" alt="Jade Mountain View" />
+      </div>
       <form className="card" onSubmit={go}>
         <h2>Jade's staff login</h2>
         <label>
@@ -85,9 +88,9 @@ export default function App() {
     <div className="wrap">
       <div className="top">
         <div className="logo">
-          <i>🛏️</i>
+          <img src="/favicon-32x32.png" alt="Jade Mountain View" />
           <div>
-            Jade's Motel
+            Jade's Mountain View
             <small>
               {new Date().toLocaleDateString("en", {
                 weekday: "long",
