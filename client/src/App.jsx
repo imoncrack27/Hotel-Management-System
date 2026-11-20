@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api, getToken, setToken } from "./lib";
 import { BookingForm, Checkout, RoomModal, RoomForm } from "./parts";
 import { Dashboard, CalendarView, Reservations, RoomsView } from "./views";
@@ -10,7 +10,20 @@ const TABS = {
   rooms: ["Rooms", RoomsView],
 };
 
-function Login({ done }) {
+function ThemeButton({ theme, toggleTheme }) {
+  return (
+    <button
+      type="button"
+      className="btn ghost"
+      onClick={toggleTheme}
+      aria-label="Toggle dark or light theme"
+    >
+      {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+    </button>
+  );
+}
+
+function Login({ done, theme, toggleTheme }) {
   const [f, setF] = useState({ email: "", password: "" }),
     [err, setErr] = useState("");
   const go = async (e) => {
@@ -25,6 +38,9 @@ function Login({ done }) {
   };
   return (
     <div className="login">
+      <div style={{ position: "fixed", top: 16, right: 16 }}>
+        <ThemeButton theme={theme} toggleTheme={toggleTheme} />
+      </div>
       <div className="big-logo">
         <img src="/Jades.jpeg" alt="Jade Mountain View" />
       </div>
@@ -61,7 +77,32 @@ export default function App() {
     [tick, setTick] = useState(0),
     [m, setM] = useState(null),
     [t, setT] = useState(null);
-  if (!authed) return <Login done={() => setAuthed(true)} />;
+
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem("jade-theme");
+    if (saved === "light" || saved === "dark") return saved;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("jade-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () =>
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+
+  if (!authed) {
+    return (
+      <Login
+        done={() => setAuthed(true)}
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
+    );
+  }
 
   const toast = (msg, bad) => {
     setT({ msg, bad });
@@ -113,6 +154,7 @@ export default function App() {
           ))}
         </nav>
         <div className="acts" style={{ margin: 0 }}>
+          <ThemeButton theme={theme} toggleTheme={toggleTheme} />
           <button className="btn" onClick={() => setM({ type: "booking" })}>
             + New booking
           </button>
