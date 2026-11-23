@@ -26,19 +26,19 @@ curl localhost:5000/api/rooms -H "Authorization: Bearer <token>"
 
 ## API
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | /api/auth/login | Staff login, returns a token |
-| GET | /api/dashboard | Revenue today, occupancy, room counts, arrivals, departures |
-| GET | /api/rooms | Rooms with live status, current guest, next booking |
-| GET | /api/rooms/available?checkIn=&checkOut= | Rooms free for those dates |
-| POST, PUT, DELETE | /api/rooms, /api/rooms/:id | Add, edit, delete a room |
-| PATCH | /api/rooms/:id/flag | Set `cleaning`, `maintenance`, or `""` (ready) |
-| GET | /api/bookings?status=&from=&to=&q= | List, search, calendar range |
-| POST | /api/bookings | Reserve (add `"walkIn": true` to check in now, `"advance": 500` for a deposit) |
-| PUT | /api/bookings/:id | Edit dates, room, guest |
-| POST | /api/bookings/:id/check-in, /check-out, /cancel | Stay lifecycle |
-| GET | /api/bookings/:id/bill | Total, paid, balance before check-out |
+| Method            | Path                                            | Purpose                                                                        |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| POST              | /api/auth/login                                 | Staff login, returns a token                                                   |
+| GET               | /api/dashboard                                  | Revenue today, occupancy, room counts, arrivals, departures                    |
+| GET               | /api/rooms                                      | Rooms with live status, current guest, next booking                            |
+| GET               | /api/rooms/available?checkIn=&checkOut=         | Rooms free for those dates                                                     |
+| POST, PUT, DELETE | /api/rooms, /api/rooms/:id                      | Add, edit, delete a room                                                       |
+| PATCH             | /api/rooms/:id/flag                             | Set `cleaning`, `maintenance`, or `""` (ready)                                 |
+| GET               | /api/bookings?status=&from=&to=&q=              | List, search, calendar range                                                   |
+| POST              | /api/bookings                                   | Reserve (add `"walkIn": true` to check in now, `"advance": 500` for a deposit) |
+| PUT               | /api/bookings/:id                               | Edit dates, room, guest                                                        |
+| POST              | /api/bookings/:id/check-in, /check-out, /cancel | Stay lifecycle                                                                 |
+| GET               | /api/bookings/:id/bill                          | Total, paid, balance before check-out                                          |
 
 ## Roadmap
 
