@@ -25,7 +25,7 @@ export function Dashboard({ ctx }) {
         .toLowerCase()
         .includes(q.toLowerCase())
   );
-  const floors = [...new Set(rooms.map((r) => r.floor))];
+  const groups = [...new Set(rooms.map((r) => r.type))];
   return (
     <>
       <div className="stats">
@@ -80,12 +80,12 @@ export function Dashboard({ ctx }) {
             </button>
           ))}
         </div>
-        {floors.map((f) => {
-          const rs = shown.filter((r) => r.floor === f);
+        {groups.map((f) => {
+          const rs = shown.filter((r) => r.type === f);
           return (
             rs.length > 0 && (
               <div key={f}>
-                <h3 className="fl">Floor {f}</h3>
+                <h3 className="fl">{f}</h3>
                 <div className="rooms">
                   {rs.map((r) => {
                     const g = r.current
@@ -141,7 +141,7 @@ export function CalendarView({ ctx }) {
     ymd(new Date(y, m, i + 1))
   );
   const arr = bks.filter((b) => b.checkIn === sel),
-    dep = bks.filter((b) => b.checkOut === sel),
+    dep = bks.filter((b) => b.checkOut === sel && b.kind !== "short"),
     stay = bks.filter((b) => b.checkIn < sel && sel < b.checkOut);
   return (
     <div className="calwrap">
@@ -185,8 +185,18 @@ export function CalendarView({ ctx }) {
           ))}
           {days.map((s, i) => {
             const a = bks.filter((b) => b.checkIn === s).length,
-              o = bks.filter((b) => b.checkOut === s).length,
-              n = bks.filter((b) => b.checkIn <= s && s < b.checkOut).length;
+              o = bks.filter(
+                (b) => b.checkOut === s && b.kind !== "short"
+              ).length,
+              n = new Set(
+                bks
+                  .filter(
+                    (b) =>
+                      (b.checkIn <= s && s < b.checkOut) ||
+                      (b.kind === "short" && b.checkIn === s)
+                  )
+                  .map((b) => b.room?._id)
+              ).size;
             return (
               <button
                 key={s}

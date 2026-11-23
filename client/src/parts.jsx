@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, today, addDays, fd, money, nights, LABEL } from "./lib";
 
 export const Pill = ({ s }) => (
@@ -23,10 +23,19 @@ const Field = ({ label, wide, ...p }) => (
     <input {...p} />
   </label>
 );
+const nowHM = () => new Date().toTimeString().slice(0, 5);
+const stay = (b) =>
+  b.kind === "short"
+    ? `${fd(b.checkIn)}, ${b.startTime} · ${b.hours}-hour stay`
+    : `${fd(b.checkIn)} to ${fd(b.checkOut)} · ${nights(b)} night${
+        nights(b) > 1 ? "s" : ""
+      }`;
 
 export function BookingRow({ b, ctx }) {
   const paid = b.payments.reduce((s, p) => s + p.amount, 0),
-    due = nights(b) * b.rate - paid;
+    due =
+      (b.kind === "short" ? b.rate : nights(b) * (b.rate + (b.extra || 0))) -
+      paid;
   const live = b.status === "reserved" || b.status === "checked_in";
   const post = (a, msg) =>
     ctx.run(() => api(`/bookings/${b._id}/${a}`, { method: "POST" }), msg);
@@ -36,8 +45,7 @@ export function BookingRow({ b, ctx }) {
       <div className="rm">
         <b>{b.guest}</b>
         <span>
-          {fd(b.checkIn)} to {fd(b.checkOut)} · {nights(b)} night
-          {nights(b) > 1 ? "s" : ""}
+          {stay(b)}
           {b.phone ? " · " + b.phone : ""}
         </span>
       </div>
@@ -99,6 +107,9 @@ export function BookingForm({ b, pre, ctx }) {
   const [f, setF] = useState(
     b
       ? {
+          kind: b.kind || "night",
+          startTime: b.startTime || "",
+          hours: b.hours || 3,
           guest: b.guest,
           phone: b.phone || "",
           checkIn: b.checkIn,
@@ -109,6 +120,9 @@ export function BookingForm({ b, pre, ctx }) {
           notes: b.notes || "",
         }
       : {
+          kind: "night",
+          startTime: nowHM(),
+          hours: 3,
           guest: "",
           phone: "",
           checkIn: start,
@@ -121,30 +135,45 @@ export function BookingForm({ b, pre, ctx }) {
           walkIn: false,
         }
   );
+  const short = f.kind === "short",
+    price = (r) => (short ? r["rate" + f.hours] : r.rate),
+    key = useRef(f.kind + f.hours);
   const [rooms, setRooms] = useState([]),
     [err, setErr] = useState("");
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
 
   // Only rooms that are free for the chosen dates are offered.
   useEffect(() => {
-    if (!(f.checkIn && f.checkOut > f.checkIn)) {
+    if (
+      short
+        ? !(f.checkIn && f.startTime)
+        : !(f.checkIn && f.checkOut > f.checkIn)
+    ) {
       setRooms([]);
       return;
     }
-    api(`/rooms/available?checkIn=${f.checkIn}&checkOut=${f.checkOut}`)
+    const qs = short
+      ? `kind=short&checkIn=${f.checkIn}&startTime=${f.startTime}&hours=${f.hours}`
+      : `checkIn=${f.checkIn}&checkOut=${f.checkOut}`;
+    api(`/rooms/available?${qs}`)
       .then((l) => {
         if (b && !l.some((r) => r._id === b.room._id))
-          l = [{ ...b.room, rate: b.rate }, ...l];
+          l = [{ ...b.room, rate: b.rate, ["rate" + f.hours]: b.rate }, ...l];
         setRooms(l);
+        const reset = key.current !== f.kind + f.hours;
+        key.current = f.kind + f.hours;
         const p = l.find((r) => r._id === f.room) || l[0];
         setF((x) => ({
           ...x,
           room: p?._id || "",
-          rate: p && (x.rate === "" || p._id !== f.room) ? p.rate : x.rate,
+          rate:
+            p && (x.rate === "" || p._id !== f.room || reset)
+              ? price(p)
+              : x.rate,
         }));
       })
       .catch((e) => setErr(e.message));
-  }, [f.checkIn, f.checkOut]);
+  }, [f.kind, f.checkIn, f.checkOut, f.startTime, f.hours]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -157,6 +186,9 @@ export function BookingForm({ b, pre, ctx }) {
           rate: +f.rate,
           guests: +f.guests,
           advance: +f.advance || 0,
+          ...(short
+            ? { hours: +f.hours }
+            : { startTime: undefined, hours: undefined }),
         },
       });
       ctx.close();
@@ -175,6 +207,23 @@ export function BookingForm({ b, pre, ctx }) {
   return (
     <Modal title={b ? "Edit booking" : "New booking"} close={ctx.close}>
       <form onSubmit={save}>
+        {!b && (
+          <div className="chips" style={{ marginTop: 0 }}>
+            {[
+              ["night", "Overnight"],
+              ["short", "Short stay"],
+            ].map(([k, l]) => (
+              <button
+                type="button"
+                key={k}
+                className={"chip" + (f.kind === k ? " on" : "")}
+                onClick={() => set("kind", k)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="f">
           <Field
             label="Guest name"
@@ -189,7 +238,7 @@ export function BookingForm({ b, pre, ctx }) {
             onChange={(e) => set("phone", e.target.value)}
           />
           <Field
-            label="Check-in"
+            label={short ? "Date" : "Check-in"}
             type="date"
             required
             value={f.checkIn}
@@ -204,13 +253,38 @@ export function BookingForm({ b, pre, ctx }) {
               }))
             }
           />
-          <Field
-            label="Check-out"
-            type="date"
-            required
-            value={f.checkOut}
-            onChange={(e) => set("checkOut", e.target.value)}
-          />
+          {short ? (
+            <>
+              <Field
+                label="Start time"
+                type="time"
+                required
+                value={f.startTime}
+                onChange={(e) => set("startTime", e.target.value)}
+              />
+              <label>
+                Length
+                <select
+                  value={f.hours}
+                  onChange={(e) => set("hours", +e.target.value)}
+                >
+                  {[3, 6, 12].map((h) => (
+                    <option key={h} value={h}>
+                      {h} hours
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : (
+            <Field
+              label="Check-out"
+              type="date"
+              required
+              value={f.checkOut}
+              onChange={(e) => set("checkOut", e.target.value)}
+            />
+          )}
           <label>
             Room (free on these dates)
             <select
@@ -221,7 +295,7 @@ export function BookingForm({ b, pre, ctx }) {
                 setF((x) => ({
                   ...x,
                   room: e.target.value,
-                  rate: r ? r.rate : x.rate,
+                  rate: r ? price(r) : x.rate,
                 }));
               }}
             >
@@ -237,7 +311,7 @@ export function BookingForm({ b, pre, ctx }) {
             </select>
           </label>
           <Field
-            label="Rate per night"
+            label={short ? "Price" : "Rate per night"}
             type="number"
             min="0"
             required
@@ -251,6 +325,22 @@ export function BookingForm({ b, pre, ctx }) {
             value={f.guests}
             onChange={(e) => set("guests", e.target.value)}
           />
+          {!short &&
+            (() => {
+              const s = rooms.find((r) => r._id === f.room),
+                x = s
+                  ? Math.max(0, f.guests - (s.includedGuests ?? 2)) *
+                    (s.extraPerson || 0)
+                  : 0;
+              return (
+                x > 0 && (
+                  <p className="mute w" style={{ margin: 0 }}>
+                    Extra guests: +{money(x)} per night (the room price covers{" "}
+                    {s.includedGuests ?? 2})
+                  </p>
+                )
+              );
+            })()}
           {!b && (
             <Field
               label="Advance paid"
@@ -312,7 +402,11 @@ export function Checkout({ b, ctx }) {
         <>
           <div className="sum">
             <span>
-              {bill.nights} night{bill.nights > 1 ? "s" : ""} at {money(b.rate)}
+              {bill.hours
+                ? `${bill.hours}-hour stay`
+                : `${bill.nights} night${bill.nights > 1 ? "s" : ""} at ${money(
+                    b.rate + (b.extra || 0)
+                  )}`}
             </span>
             <span>Already paid {money(bill.paid)}</span>
             <b>
@@ -417,8 +511,28 @@ export function RoomModal({ r, ctx }) {
 export function RoomForm({ r, ctx }) {
   const [f, setF] = useState(
     r
-      ? { number: r.number, floor: r.floor, type: r.type, rate: r.rate }
-      : { number: "", floor: 1, type: "Standard", rate: 1200 }
+      ? {
+          number: r.number,
+          floor: r.floor,
+          type: r.type,
+          rate: r.rate,
+          rate3: r.rate3 || 0,
+          rate6: r.rate6 || 0,
+          rate12: r.rate12 || 0,
+          includedGuests: r.includedGuests ?? 2,
+          extraPerson: r.extraPerson || 0,
+        }
+      : {
+          number: "",
+          floor: 1,
+          type: "Standard",
+          rate: 1200,
+          rate3: 0,
+          rate6: 0,
+          rate12: 0,
+          includedGuests: 2,
+          extraPerson: 0,
+        }
   );
   const [err, setErr] = useState("");
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
@@ -432,7 +546,16 @@ export function RoomForm({ r, ctx }) {
     try {
       await api(r ? `/rooms/${r._id}` : "/rooms", {
         method: r ? "PUT" : "POST",
-        body: { ...f, floor: +f.floor, rate: +f.rate },
+        body: {
+          ...f,
+          floor: +f.floor,
+          rate: +f.rate,
+          rate3: +f.rate3 || 0,
+          rate6: +f.rate6 || 0,
+          rate12: +f.rate12 || 0,
+          includedGuests: +f.includedGuests || 2,
+          extraPerson: +f.extraPerson || 0,
+        },
       });
       done("Room saved");
     } catch (x) {
@@ -482,6 +605,44 @@ export function RoomForm({ r, ctx }) {
             value={f.rate}
             onChange={(e) => set("rate", e.target.value)}
           />
+          <Field
+            label="3-hour price"
+            type="number"
+            min="0"
+            value={f.rate3}
+            onChange={(e) => set("rate3", e.target.value)}
+          />
+          <Field
+            label="6-hour price"
+            type="number"
+            min="0"
+            value={f.rate6}
+            onChange={(e) => set("rate6", e.target.value)}
+          />
+          <Field
+            label="12-hour price"
+            type="number"
+            min="0"
+            value={f.rate12}
+            onChange={(e) => set("rate12", e.target.value)}
+          />
+          <Field
+            label="Guests included in price"
+            type="number"
+            min="1"
+            value={f.includedGuests}
+            onChange={(e) => set("includedGuests", e.target.value)}
+          />
+          <Field
+            label="Extra guest fee (per night)"
+            type="number"
+            min="0"
+            value={f.extraPerson}
+            onChange={(e) => set("extraPerson", e.target.value)}
+          />
+          <p className="mute w" style={{ margin: 0 }}>
+            Short-stay prices: leave 0 if this room doesn't offer that length.
+          </p>
         </div>
         <p className="err">{err}</p>
         <div className="acts">
